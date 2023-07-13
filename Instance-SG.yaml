@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Creating an EC2 Instance
+Resources:
+  MyIAMRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: MyEC2S3FullAccessRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'
+  DemoInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      InstanceProfileName: demo-ec2-instance-profile
+      Path: '/'
+      Roles: 
+       - 
+         Ref: "MyIAMRole"
+  MyEC2Instance: 
+      Type: AWS::EC2::Instance
+      Properties: 
+        ImageId: "ami-053b0d53c279acc90"
+        KeyName: "jenkins"
+        AvailabilityZone: "us-east-1a"
+        InstanceType: "t2.micro"
+        IamInstanceProfile: !Ref DemoInstanceProfile
+        UserData: 
+          Fn::Base64: !Sub |
+            #!/bin/bash -xe
+            # Install AWS CLI
+            apt-get update -y
+            apt-get install -y awscli
+            apt install docker.io -y
+            systemctl start docker
+            systemctl enable docker
+            # Fetch data from S3 bucket
+            mkdir -p /home/ubuntu/django-todo-app-bucket
+            aws s3 sync s3://django-todo-app-bucket/ /home/ubuntu/django-todo-app-bucket/
+            cd /home/ubuntu/django-todo-app-bucket
+            usermod -aG docker ubuntu
+            docker build -t todo-app .                
+            docker run -p 8000:8000 -d todo-app
+             
+        SecurityGroupIds: 
+          - Ref: InstanceSecurityGroup
+        Tags:
+          - Key: "Name"
+            Value: "web"
+  InstanceSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: "my-SG"
+        VpcId: "vpc-048678480ab6a2986"
+        GroupName: "Instance-SG"
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: '80'
+            ToPort: '80'
+            CidrIp: 0.0.0.0/0
+          - IpProtocol: tcp
+            FromPort: '443'
+            ToPort: '443'
+            CidrIp: 0.0.0.0/0
+          - IpProtocol: tcp
+            FromPort: '22'
+            ToPort: '22'
+            CidrIp: 0.0.0.0/0
+          - IpProtocol: tcp
+            FromPort: 0
+            ToPort: 65535
+            CidrIp: 0.0.0.0/0
+        SecurityGroupEgress:
+          - IpProtocol: "-1"
+            FromPort: '0'
+            ToPort: '0'
+            CidrIp: 0.0.0.0/0
