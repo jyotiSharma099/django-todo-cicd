@@ -56,11 +56,11 @@ pipeline {
                 def stackStatus = sh(returnStatus: true, script: 'aws cloudformation describe-stacks --stack-name myteststack')
 if (stackStatus == 0) {
     // Stack exists, execute update-stack command
-    sh 'aws cloudformation update-stack --stack-name myteststack --template-url https://cf-template-for-creation.s3.amazonaws.com/Instance-SG.yaml --capabilities CAPABILITY_NAMED_IAM'
+    sh 'aws cloudformation update-stack --stack-name myteststack --template-body file://Instance-SG.yaml --capabilities CAPABILITY_NAMED_IAM'
     echo "CloudFormation stack updated."
 } else {
     // Stack does not exist, execute create-stack command
-    sh 'aws cloudformation create-stack --stack-name myteststack --template-url https://cf-template-for-creation.s3.amazonaws.com/Instance-SG.yaml --capabilities CAPABILITY_NAMED_IAM'
+    sh 'aws cloudformation create-stack --stack-name myteststack --template-body file://Instance-SG.yaml --capabilities CAPABILITY_NAMED_IAM'
     echo "CloudFormation stack created."
 }
 
