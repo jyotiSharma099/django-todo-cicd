@@ -50,6 +50,8 @@ Resources:
             pip install django
             python3 manage.py makemigrations
             aws s3 cp s3://django-todo-app-bucket888887/django.conf /etc/apache2/sites-available/django.conf
+            cd /etc/apache2/sites-available/
+            a2dissite 000-default.conf 
             systemctl restart apache2
         SecurityGroupIds: 
           - Ref: InstanceSecurityGroup
