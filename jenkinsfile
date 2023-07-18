@@ -1,0 +1,72 @@
+pipeline {
+    agent any
+    stages {
+    stage('Clone GitHub Repository') {
+        steps {
+            git branch: 'develop', url: 'https://github.com/jyotiSharma099/django-todo-cicd.git'
+            sh 'ls -lhtr' 
+        }
+    }
+    
+    stage('Install awscli') {
+        steps {
+            sh 'sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"'
+            sh 'sudo apt-get install -y unzip'
+            sh 'sudo unzip -o awscliv2.zip'
+            sh 'sudo rm awscliv2.zip'
+            sh 'sudo ./aws/install --update'
+        }
+    }
+    
+    stage('AWS Configure') {
+        steps {
+            withCredentials([
+                [
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-credentials',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]
+            ]) {
+                sh 'aws s3 ls'
+                sh 'aws s3api create-bucket --bucket django-todo-app-bucket888887'
+            }
+        }
+    }
+    
+    
+    stage('Sync Data to S3 Bucket') {
+        steps {
+            script {
+                def shouldUpdateBucket = true // Define your condition here
+                
+                if (shouldUpdateBucket) {
+                    sh 'aws s3 sync . s3://django-todo-app-bucket888887/ --exclude "aws/*"'
+                    echo "Data synced to S3 bucket."
+                } else {
+                    echo "Skipping data sync to S3 bucket."
+                }
+            }
+        }
+    }
+    
+    stage('Create or Update CloudFormation Stack') {
+        steps {
+            script {
+                def stackStatus = sh(returnStatus: true, script: 'aws cloudformation describe-stacks --stack-name myteststack')
+if (stackStatus == 0) {
+    // Stack exists, execute update-stack command
+    sh 'aws cloudformation update-stack --stack-name myteststack --template-url https://cf-template-for-creation.s3.amazonaws.com/Instance-SG.yaml --capabilities CAPABILITY_NAMED_IAM'
+    echo "CloudFormation stack updated."
+} else {
+    // Stack does not exist, execute create-stack command
+    sh 'aws cloudformation create-stack --stack-name myteststack --template-url https://cf-template-for-creation.s3.amazonaws.com/Instance-SG.yaml --capabilities CAPABILITY_NAMED_IAM'
+    echo "CloudFormation stack created."
+}
+
+            }
+        }
+    }
+}
+
+}
